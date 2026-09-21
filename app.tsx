@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { LazyStore } from '@tauri-apps/plugin-store';
+import { Store } from '@tauri-apps/plugin-store';
 import ReactMarkdown from 'react-markdown';
 import './App.css';
 
@@ -9,15 +9,16 @@ interface Message {
   content: string;
 }
 
-// Initialize persistent store file
-const store = new LazyStore('chat-history.json');
+const initialMessage: Message = {
+  role: 'assistant',
+  content: 'Hello! I am **⚡️ThunderMind⚡️**. How can I help you code today?'
+};
 
 function App() {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I am **⚡️ThunderMind⚡️**. How can I help you code today?' }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [storeInstance, setStoreInstance] = useState<Store | null>(null);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -30,36 +31,53 @@ function App() {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Load chat history from disk when the app mounts
+  // Load store and previous chat history on mount
   useEffect(() => {
-    async function loadHistory() {
+    async function initStore() {
       try {
+        const store = await Store.load('chat-history.json');
+        setStoreInstance(store);
+        
         const savedMessages = await store.get<Message[]>('messages');
         if (savedMessages && savedMessages.length > 0) {
           setMessages(savedMessages);
         }
       } catch (err) {
-        console.error('Failed to load chat history:', err);
+        console.error('Failed to load chat history store:', err);
       } finally {
         setIsInitialized(true);
       }
     }
-    loadHistory();
+    initStore();
   }, []);
 
-  // Save messages to disk whenever they change (after initial load)
+  // Save messages to disk whenever they update
   useEffect(() => {
-    if (!isInitialized) return;
+    if (!isInitialized || !storeInstance) return;
     async function saveHistory() {
       try {
-        await store.set('messages', messages);
-        await store.save();
+        await storeInstance.set('messages', messages);
+        await storeInstance.save();
       } catch (err) {
         console.error('Failed to save chat history:', err);
       }
     }
     saveHistory();
-  }, [messages, isInitialized]);
+  }, [messages, isInitialized, storeInstance]);
+
+  // Clear chat history function
+  const clearHistory = async () => {
+    const freshMessages = [initialMessage];
+    setMessages(freshMessages);
+    if (storeInstance) {
+      try {
+        await storeInstance.set('messages', freshMessages);
+        await storeInstance.save();
+      } catch (err) {
+        console.error('Failed to clear history on disk:', err);
+      }
+    }
+  };
 
   // Handle native window dragging
   const handleMouseDown = async (e: MouseEvent<HTMLDivElement>) => {
@@ -141,9 +159,17 @@ function App() {
 
   return (
     <main className="container">
-      {/* Draggable Title Bar */}
+      {/* Draggable Title Bar with Clear History Action */}
       <div onMouseDown={handleMouseDown} className="window-header">
         <span className="window-title">⚡️ThunderMind⚡️</span>
+        <button 
+          type="button" 
+          onClick={clearHistory} 
+          className="clear-history-btn"
+          title="Clear Chat History"
+        >
+          🗑️ Clear
+        </button>
       </div>
 
       {/* Chat Messages Log */}
@@ -185,4 +211,5 @@ function App() {
   );
 }
 
+App.displayName = 'App';
 export default App;
