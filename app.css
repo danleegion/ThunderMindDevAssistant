@@ -4,6 +4,7 @@ body {
   margin: 0;
   font-family: system-ui, -apple-system, sans-serif;
   overflow: hidden;
+  border-radius: 8px;
 }
 
 .container {
@@ -12,6 +13,7 @@ body {
   height: 100vh;
   margin: 0;
   padding: 0;
+  box-sizing: border-box;
 }
 
 .window-header {
@@ -24,6 +26,8 @@ body {
   user-select: none;
   -webkit-user-select: none;
   flex-shrink: 0;
+  border-top-left-radius: 8px;
+  border-top-right-radius: 8px;
 }
 
 .window-title {
@@ -47,7 +51,8 @@ body {
   border-radius: 8px;
   font-size: 13px;
   line-height: 1.4;
-  max-width: 85%;
+  max-width: 90%;
+  word-break: break-word;
 }
 
 .message.user {
@@ -58,6 +63,49 @@ body {
 .message.assistant {
   background-color: #333333;
   align-self: flex-start;
+}
+
+.message-sender {
+  margin: 0 0 4px 0;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.message-content {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.message-content p {
+  margin: 0 0 8px 0;
+}
+
+.message-content p:last-child {
+  margin-bottom: 0;
+}
+
+.message-content code {
+  background-color: #1e1e1e;
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #ce9178;
+}
+
+.message-content pre {
+  background-color: #1e1e1e;
+  padding: 10px;
+  border-radius: 6px;
+  overflow-x: auto;
+  border: 1px solid #444;
+  margin: 8px 0;
+}
+
+.message-content pre code {
+  background-color: transparent;
+  padding: 0;
+  color: #d4d4d4;
 }
 
 .chat-input-form {
