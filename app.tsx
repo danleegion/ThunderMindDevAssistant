@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { Store } from '@tauri-apps/plugin-store';
+import { LazyStore } from '@tauri-apps/plugin-store';
 import ReactMarkdown from 'react-markdown';
 import './App.css';
 
@@ -14,11 +14,13 @@ const initialMessage: Message = {
   content: 'Hello! I am **⚡️ThunderMind⚡️**. How can I help you code today?'
 };
 
+// Use LazyStore for resilient file-backed storage
+const store = new LazyStore('chat-history.json');
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [storeInstance, setStoreInstance] = useState<Store | null>(null);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -31,51 +33,48 @@ function App() {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Load store and previous chat history on mount
+  // Load chat history once on mount
   useEffect(() => {
-    async function initStore() {
+    async function initHistory() {
       try {
-        const store = await Store.load('chat-history.json');
-        setStoreInstance(store);
-        
+        await store.init();
         const savedMessages = await store.get<Message[]>('messages');
-        if (savedMessages && savedMessages.length > 0) {
+        if (savedMessages && Array.isArray(savedMessages) && savedMessages.length > 0) {
           setMessages(savedMessages);
         }
       } catch (err) {
-        console.error('Failed to load chat history store:', err);
+        console.error('Failed to load chat history from disk:', err);
       } finally {
         setIsInitialized(true);
       }
     }
-    initStore();
+    initHistory();
   }, []);
 
-  // Save messages to disk whenever they update
+  // Save chat history immediately when messages change (after init)
   useEffect(() => {
-    if (!isInitialized || !storeInstance) return;
-    async function saveHistory() {
+    if (!isInitialized) return;
+    
+    async function persistMessages() {
       try {
-        await storeInstance.set('messages', messages);
-        await storeInstance.save();
+        await store.set('messages', messages);
+        await store.save();
       } catch (err) {
-        console.error('Failed to save chat history:', err);
+        console.error('Failed to save chat history to disk:', err);
       }
     }
-    saveHistory();
-  }, [messages, isInitialized, storeInstance]);
+    persistMessages();
+  }, [messages, isInitialized]);
 
   // Clear chat history function
   const clearHistory = async () => {
     const freshMessages = [initialMessage];
     setMessages(freshMessages);
-    if (storeInstance) {
-      try {
-        await storeInstance.set('messages', freshMessages);
-        await storeInstance.save();
-      } catch (err) {
-        console.error('Failed to clear history on disk:', err);
-      }
+    try {
+      await store.set('messages', freshMessages);
+      await store.save();
+    } catch (err) {
+      console.error('Failed to clear history on disk:', err);
     }
   };
 
