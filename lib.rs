@@ -3,13 +3,30 @@ use tauri::{
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
     Manager,
 };
-use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut};
+use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(
+            tauri_plugin_global_shortcut::Builder::new()
+                .with_handler(|app, shortcut, event| {
+                    if event.state == ShortcutState::Pressed {
+                        if shortcut.matches(Modifiers::SUPER | Modifiers::SHIFT, Code::Space) {
+                            if let Some(window) = app.get_webview_window("main") {
+                                if window.is_visible().unwrap_or(false) {
+                                    let _ = window.hide();
+                                } else {
+                                    let _ = window.show();
+                                    let _ = window.set_focus();
+                                }
+                            }
+                        }
+                    }
+                })
+                .build(),
+        )
         .setup(|app| {
             // Hide dock icon on macOS so it runs purely as a menu bar app
             #[cfg(target_os = "macos")]
@@ -49,27 +66,10 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Register global shortcut: Cmd + Shift + Space to toggle window
-            let handle = app.handle().clone();
+            // Register the global shortcut (Cmd + Shift + Space)
             app.global_shortcut().register(
                 Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Space)
             )?;
-
-            // Listen for when the shortcut is pressed
-            app.global_shortcut().on_shortcut(move |app, shortcut, event| {
-                if shortcut.matches(Modifiers::SUPER | Modifiers::SHIFT, Code::Space) {
-                    if let tauri_plugin_global_shortcut::ShortcutEvent::Pressed = event {
-                        if let Some(window) = app.get_webview_window("main") {
-                            if window.is_visible().unwrap_or(false) {
-                                let _ = window.hide();
-                            } else {
-                                let _ = window.show();
-                                let _ = window.set_focus();
-                            }
-                        }
-                    }
-                }
-            });
 
             Ok(())
         })
