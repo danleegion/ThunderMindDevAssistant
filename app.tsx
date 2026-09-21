@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { LazyStore } from '@tauri-apps/plugin-store';
+import { Store } from '@tauri-apps/plugin-store';
 import ReactMarkdown from 'react-markdown';
 import './App.css';
 
@@ -14,13 +14,11 @@ const initialMessage: Message = {
   content: 'Hello! I am **⚡️ThunderMind⚡️**. How can I help you code today?'
 };
 
-// Use LazyStore for resilient file-backed storage
-const store = new LazyStore('chat-history.json');
-
 function App() {
   const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [storeInstance, setStoreInstance] = useState<Store | null>(null);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -33,48 +31,51 @@ function App() {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Load chat history once on mount
+  // Load store and previous chat history on mount
   useEffect(() => {
-    async function initHistory() {
+    async function initStore() {
       try {
-        await store.init();
+        const store = await Store.load('chat-history.json');
+        setStoreInstance(store);
+        
         const savedMessages = await store.get<Message[]>('messages');
         if (savedMessages && Array.isArray(savedMessages) && savedMessages.length > 0) {
           setMessages(savedMessages);
         }
       } catch (err) {
-        console.error('Failed to load chat history from disk:', err);
+        console.error('Failed to load chat history store:', err);
       } finally {
         setIsInitialized(true);
       }
     }
-    initHistory();
+    initStore();
   }, []);
 
-  // Save chat history immediately when messages change (after init)
+  // Save messages to disk whenever they update
   useEffect(() => {
-    if (!isInitialized) return;
-    
-    async function persistMessages() {
+    if (!isInitialized || !storeInstance) return;
+    async function saveHistory() {
       try {
-        await store.set('messages', messages);
-        await store.save();
+        await storeInstance.set('messages', messages);
+        await storeInstance.save();
       } catch (err) {
-        console.error('Failed to save chat history to disk:', err);
+        console.error('Failed to save chat history:', err);
       }
     }
-    persistMessages();
-  }, [messages, isInitialized]);
+    saveHistory();
+  }, [messages, isInitialized, storeInstance]);
 
   // Clear chat history function
   const clearHistory = async () => {
     const freshMessages = [initialMessage];
     setMessages(freshMessages);
-    try {
-      await store.set('messages', freshMessages);
-      await store.save();
-    } catch (err) {
-      console.error('Failed to clear history on disk:', err);
+    if (storeInstance) {
+      try {
+        await storeInstance.set('messages', freshMessages);
+        await storeInstance.save();
+      } catch (err) {
+        console.error('Failed to clear history on disk:', err);
+      }
     }
   };
 
@@ -178,7 +179,46 @@ function App() {
             <p className="message-sender"><strong>{msg.role === 'user' ? 'You' : '⚡️ThunderMind⚡️'}</strong></p>
             <div className="message-content">
               {msg.role === 'assistant' ? (
-                <ReactMarkdown>{msg.content}</ReactMarkdown>
+                <ReactMarkdown
+                  components={{
+                    code({ node, inline, className, children, ...props }: any) {
+                      const match = /language-(\w+)/.exec(className || '');
+                      const codeString = String(children).replace(/\n$/, '');
+
+                      if (!inline && match) {
+                        const [copied, setCopied] = useState(false);
+
+                        const handleCopy = () => {
+                          navigator.clipboard.writeText(codeString);
+                          setCopied(true);
+                          setTimeout(() => setCopied(false), 2000);
+                        };
+
+                        return (
+                          <div className="code-block-wrapper">
+                            <div className="code-block-header">
+                              <span className="code-language">{match[1]}</span>
+                              <button onClick={handleCopy} className="code-copy-btn">
+                                {copied ? '✅ Copied!' : '📋 Copy'}
+                              </button>
+                            </div>
+                            <pre {...props}>
+                              <code className={className}>{children}</code>
+                            </pre>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      );
+                    }
+                  }}
+                >
+                  {msg.content}
+                </ReactMarkdown>
               ) : (
                 <p>{msg.content}</p>
               )}
