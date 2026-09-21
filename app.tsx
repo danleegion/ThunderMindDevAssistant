@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import ReactMarkdown from 'react-markdown';
 import './App.css';
 
 interface Message {
@@ -9,7 +10,7 @@ interface Message {
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I am ThunderMind. How can I help you code today?' }
+    { role: 'assistant', content: 'Hello! I am **ThunderMind**. How can I help you code today?' }
   ]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -24,7 +25,7 @@ function App() {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Handle window dragging
+  // Handle native window dragging
   const handleMouseDown = async (e: MouseEvent<HTMLDivElement>) => {
     if (e.button === 0) {
       const appWindow = getCurrentWindow();
@@ -58,7 +59,7 @@ function App() {
     } catch (error) {
       setMessages((prev) => [
         ...prev, 
-        { role: 'assistant', content: 'Error: Could not connect to local Ollama service. Is it running?' }
+        { role: 'assistant', content: '⚠️ **Error:** Could not connect to local Ollama service. Is it running?' }
       ]);
     } finally {
       setLoading(false);
@@ -76,10 +77,24 @@ function App() {
       <div className="chat-messages">
         {messages.map((msg, index) => (
           <div key={index} className={`message ${msg.role}`}>
-            <p><strong>{msg.role === 'user' ? 'You' : 'ThunderMind'}:</strong> {msg.content}</p>
+            <p className="message-sender"><strong>{msg.role === 'user' ? 'You' : 'ThunderMind'}</strong></p>
+            <div className="message-content">
+              {msg.role === 'assistant' ? (
+                <ReactMarkdown>{msg.content}</ReactMarkdown>
+              ) : (
+                <p>{msg.content}</p>
+              )}
+            </div>
           </div>
         ))}
-        {loading && <div className="message assistant"><p><em>Thinking...</em></p></div>}
+        {loading && (
+          <div className="message assistant">
+            <p className="message-sender"><strong>ThunderMind</strong></p>
+            <div className="message-content">
+              <p><em>Thinking...</em></p>
+            </div>
+          </div>
+        )}
         <div ref={messagesEndRef} />
       </div>
 
