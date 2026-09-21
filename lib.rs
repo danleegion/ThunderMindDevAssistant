@@ -9,6 +9,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_store::Builder::default().build())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_handler(|app, shortcut, event| {
@@ -28,15 +29,12 @@ pub fn run() {
                 .build(),
         )
         .setup(|app| {
-            // Hide dock icon on macOS so it runs purely as a menu bar app
             #[cfg(target_os = "macos")]
             app.set_activation_policy(tauri::ActivationPolicy::Accessory);
 
-            // Create a simple menu with a Quit option
-            let quit_item = MenuItem::with_id(app, "quit", "Quit ThunderMind", true, None::<&str>)?;
+            let quit_item = MenuItem::with_id(app, "quit", "Quit ⚡️ThunderMind⚡️", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&quit_item])?;
 
-            // Build the system tray icon
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
@@ -66,7 +64,6 @@ pub fn run() {
                 })
                 .build(app)?;
 
-            // Register the global shortcut (Cmd + Shift + Space)
             app.global_shortcut().register(
                 Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Space)
             )?;
