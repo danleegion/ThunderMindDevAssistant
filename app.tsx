@@ -33,14 +33,20 @@ function App() {
     }
   };
 
-  // Function to send prompt to local Ollama instance
+  // Function to send prompt and stream response from local Ollama instance
   const sendMessage = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!input.trim() || loading) return;
 
     const userMessage = input.trim();
     setInput('');
-    setMessages((prev) => [...prev, { role: 'user', content: userMessage }]);
+    
+    // Add user message and an empty placeholder for the assistant response
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: '' }
+    ]);
     setLoading(true);
 
     try {
@@ -50,17 +56,51 @@ function App() {
         body: JSON.stringify({
           model: 'qwen2.5-coder:7b',
           prompt: userMessage,
-          stream: false
+          stream: true
         })
       });
 
-      const data = await response.json();
-      setMessages((prev) => [...prev, { role: 'assistant', content: data.response }]);
+      if (!response.body) throw new Error('ReadableStream not supported.');
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let accumulatedResponse = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        // Ollama streams newline-delimited JSON objects
+        const lines = chunk.split('\n');
+
+        for (const line of lines) {
+          if (line.trim() !== '') {
+            const parsed = JSON.parse(line);
+            if (parsed.response) {
+              accumulatedResponse += parsed.response;
+              // Update the latest assistant message incrementally
+              setMessages((prev) => {
+                const newMessages = [...prev];
+                newMessages[newMessages.length - 1] = {
+                  role: 'assistant',
+                  content: accumulatedResponse
+                };
+                return newMessages;
+              });
+            }
+          }
+        }
+      }
     } catch (error) {
-      setMessages((prev) => [
-        ...prev, 
-        { role: 'assistant', content: '⚠️ **Error:** Could not connect to local Ollama service. Is it running?' }
-      ]);
+      setMessages((prev) => {
+        const newMessages = [...prev];
+        newMessages[newMessages.length - 1] = {
+          role: 'assistant',
+          content: '⚠️ **Error:** Could not connect to local Ollama service. Is it running?'
+        };
+        return newMessages;
+      });
     } finally {
       setLoading(false);
     }
@@ -70,7 +110,7 @@ function App() {
     <main className="container">
       {/* Draggable Title Bar */}
       <div onMouseDown={handleMouseDown} className="window-header">
-        <span className="window-title">ThunderMind Dev Assistant</span>
+        <span className="window-title">ThunderMind</span>
       </div>
 
       {/* Chat Messages Log */}
@@ -87,7 +127,7 @@ function App() {
             </div>
           </div>
         ))}
-        {loading && (
+        {loading && messages[messages.length - 1]?.content === '' && (
           <div className="message assistant">
             <p className="message-sender"><strong>ThunderMind</strong></p>
             <div className="message-content">
