@@ -1,5 +1,4 @@
-
-import { useState, type FormEvent, type MouseEvent } from 'react';
+import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import './App.css';
 
@@ -14,6 +13,16 @@ function App() {
   ]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
   // Handle window dragging
   const handleMouseDown = async (e: MouseEvent<HTMLDivElement>) => {
@@ -71,6 +80,7 @@ function App() {
           </div>
         ))}
         {loading && <div className="message assistant"><p><em>Thinking...</em></p></div>}
+        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Form */}
