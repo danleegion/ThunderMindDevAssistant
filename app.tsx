@@ -78,20 +78,28 @@ function App() {
     saveHistory();
   }, [messages, isInitialized, storeInstance]);
 
-  // Save settings when they change
+  // Save settings instantly when they change
   const handleModelChange = async (model: string) => {
     setSelectedModel(model);
     if (storeInstance) {
-      await storeInstance.set('selectedModel', model);
-      await storeInstance.save();
+      try {
+        await storeInstance.set('selectedModel', model);
+        await storeInstance.save();
+      } catch (err) {
+        console.error('Failed to save selected model:', err);
+      }
     }
   };
 
   const handleTempModeChange = async (mode: string) => {
     setTempMode(mode);
     if (storeInstance) {
-      await storeInstance.set('tempMode', mode);
-      await storeInstance.save();
+      try {
+        await storeInstance.set('tempMode', mode);
+        await storeInstance.save();
+      } catch (err) {
+        console.error('Failed to save temp mode:', err);
+      }
     }
   };
 
