@@ -18,6 +18,12 @@ function App() {
   const [messages, setMessages] = useState<Message[]>([initialMessage]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  
+  // Settings State
+  const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
+  const [selectedModel, setSelectedModel] = useState<string>('qwen2.5-coder:7b');
+  const [tempMode, setTempMode] = useState<string>('balanced');
+  
   const [storeInstance, setStoreInstance] = useState<Store | null>(null);
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
@@ -31,7 +37,7 @@ function App() {
     scrollToBottom();
   }, [messages, loading]);
 
-  // Load store and previous chat history on mount
+  // Load store, past messages, and settings on mount
   useEffect(() => {
     async function initStore() {
       try {
@@ -42,8 +48,15 @@ function App() {
         if (savedMessages && Array.isArray(savedMessages) && savedMessages.length > 0) {
           setMessages(savedMessages);
         }
+
+        const savedModel = await store.get<string>('selectedModel');
+        if (savedModel) setSelectedModel(savedModel);
+
+        const savedTempMode = await store.get<string>('tempMode');
+        if (savedTempMode) setTempMode(savedTempMode);
+
       } catch (err) {
-        console.error('Failed to load chat history store:', err);
+        console.error('Failed to load store:', err);
       } finally {
         setIsInitialized(true);
       }
@@ -64,6 +77,33 @@ function App() {
     }
     saveHistory();
   }, [messages, isInitialized, storeInstance]);
+
+  // Save settings when they change
+  const handleModelChange = async (model: string) => {
+    setSelectedModel(model);
+    if (storeInstance) {
+      await storeInstance.set('selectedModel', model);
+      await storeInstance.save();
+    }
+  };
+
+  const handleTempModeChange = async (mode: string) => {
+    setTempMode(mode);
+    if (storeInstance) {
+      await storeInstance.set('tempMode', mode);
+      await storeInstance.save();
+    }
+  };
+
+  // Convert friendly mode to actual Ollama temperature float
+  const getTemperatureValue = (mode: string): number => {
+    switch (mode) {
+      case 'precise': return 0.1;
+      case 'balanced': return 0.4;
+      case 'creative': return 0.8;
+      default: return 0.4;
+    }
+  };
 
   // Clear chat history function
   const clearHistory = async () => {
@@ -107,9 +147,12 @@ function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'qwen2.5-coder:7b',
+          model: selectedModel,
           prompt: userMessage,
-          stream: true
+          stream: true,
+          options: {
+            temperature: getTemperatureValue(tempMode)
+          }
         })
       });
 
@@ -159,18 +202,75 @@ function App() {
 
   return (
     <main className="container">
-      {/* Draggable Title Bar with Clear History Action */}
+      {/* Draggable Title Bar */}
       <div onMouseDown={handleMouseDown} className="window-header">
         <span className="window-title">⚡️ThunderMind⚡️</span>
-        <button 
-          type="button" 
-          onClick={clearHistory} 
-          className="clear-history-btn"
-          title="Clear Chat History"
-        >
-          🗑️ Clear
-        </button>
+        <div className="header-actions">
+          <button 
+            type="button" 
+            onClick={() => setIsSettingsOpen(true)} 
+            className="header-btn"
+            title="Open Settings"
+          >
+            ⚙️ Settings
+          </button>
+          <button 
+            type="button" 
+            onClick={clearHistory} 
+            className="header-btn"
+            title="Clear Chat History"
+          >
+            🗑️ Clear
+          </button>
+        </div>
       </div>
+
+      {/* Settings Modal Overlay */}
+      {isSettingsOpen && (
+        <div className="settings-modal-overlay">
+          <div className="settings-modal">
+            <div className="settings-header">
+              <h3>ThunderMind Preferences</h3>
+              <button onClick={() => setIsSettingsOpen(false)} className="close-btn">✕</button>
+            </div>
+            
+            <div className="settings-field">
+              <label><strong>Local Model</strong></label>
+              <select 
+                value={selectedModel} 
+                onChange={(e) => handleModelChange(e.target.value)}
+                className="settings-select"
+              >
+                <option value="qwen2.5-coder:7b">qwen2.5-coder:7b (Recommended)</option>
+                <option value="deepseek-coder:6.7b">deepseek-coder:6.7b</option>
+                <option value="llama3:8b">llama3:8b</option>
+              </select>
+            </div>
+
+            <div className="settings-field">
+              <label><strong>Assistant Mode</strong></label>
+              <select 
+                value={tempMode} 
+                onChange={(e) => handleTempModeChange(e.target.value)}
+                className="settings-select"
+              >
+                <option value="precise">🔒 Precise & Strict (Best for debugging & refactoring)</option>
+                <option value="balanced">⚖️ Balanced (Best for general coding & Q&A)</option>
+                <option value="creative">💡 Creative & Exploratory (Best for architecture & brainstorming)</option>
+              </select>
+              <p className="settings-hint">
+                {tempMode === 'precise' && "Keeps outputs predictable and strictly adheres to syntax rules with minimal variance."}
+                {tempMode === 'balanced' && "A great mix of logical accuracy and natural conversational explanation."}
+                {tempMode === 'creative' && "Allows the model to think outside the box and suggest alternative approaches."}
+              </p>
+            </div>
+
+            <div className="settings-footer">
+              <button onClick={() => setIsSettingsOpen(false)} className="save-btn">Done</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Chat Messages Log */}
       <div className="chat-messages">
