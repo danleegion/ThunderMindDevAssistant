@@ -10,7 +10,7 @@ interface Message {
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Hello! I am **ThunderMind**. How can I help you code today?' }
+    { role: 'assistant', content: 'Hello! I am **⚡️ThunderMind⚡️**. How can I help you code today?' }
   ]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
@@ -110,14 +110,14 @@ function App() {
     <main className="container">
       {/* Draggable Title Bar */}
       <div onMouseDown={handleMouseDown} className="window-header">
-        <span className="window-title">ThunderMind</span>
+        <span className="window-title">⚡️ThunderMind⚡️</span>
       </div>
 
       {/* Chat Messages Log */}
       <div className="chat-messages">
         {messages.map((msg, index) => (
           <div key={index} className={`message ${msg.role}`}>
-            <p className="message-sender"><strong>{msg.role === 'user' ? 'You' : 'ThunderMind'}</strong></p>
+            <p className="message-sender"><strong>{msg.role === 'user' ? 'You' : '⚡️ThunderMind⚡️'}</strong></p>
             <div className="message-content">
               {msg.role === 'assistant' ? (
                 <ReactMarkdown>{msg.content}</ReactMarkdown>
@@ -129,7 +129,7 @@ function App() {
         ))}
         {loading && messages[messages.length - 1]?.content === '' && (
           <div className="message assistant">
-            <p className="message-sender"><strong>ThunderMind</strong></p>
+            <p className="message-sender"><strong>⚡️ThunderMind⚡️</strong></p>
             <div className="message-content">
               <p><em>Thinking...</em></p>
             </div>
@@ -144,7 +144,7 @@ function App() {
           type="text"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Ask Qwen a coding question..."
+          placeholder="Ask ⚡️ThunderMind⚡️ a coding question..."
         />
         <button type="submit" disabled={loading}>Send</button>
       </form>
