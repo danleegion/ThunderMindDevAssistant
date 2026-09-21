@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, type FormEvent, type MouseEvent } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
+import { LazyStore } from '@tauri-apps/plugin-store';
 import ReactMarkdown from 'react-markdown';
 import './App.css';
 
@@ -8,12 +9,16 @@ interface Message {
   content: string;
 }
 
+// Initialize persistent store file
+const store = new LazyStore('chat-history.json');
+
 function App() {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Hello! I am **⚡️ThunderMind⚡️**. How can I help you code today?' }
   ]);
   const [input, setInput] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [isInitialized, setIsInitialized] = useState<boolean>(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -24,6 +29,37 @@ function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, loading]);
+
+  // Load chat history from disk when the app mounts
+  useEffect(() => {
+    async function loadHistory() {
+      try {
+        const savedMessages = await store.get<Message[]>('messages');
+        if (savedMessages && savedMessages.length > 0) {
+          setMessages(savedMessages);
+        }
+      } catch (err) {
+        console.error('Failed to load chat history:', err);
+      } finally {
+        setIsInitialized(true);
+      }
+    }
+    loadHistory();
+  }, []);
+
+  // Save messages to disk whenever they change (after initial load)
+  useEffect(() => {
+    if (!isInitialized) return;
+    async function saveHistory() {
+      try {
+        await store.set('messages', messages);
+        await store.save();
+      } catch (err) {
+        console.error('Failed to save chat history:', err);
+      }
+    }
+    saveHistory();
+  }, [messages, isInitialized]);
 
   // Handle native window dragging
   const handleMouseDown = async (e: MouseEvent<HTMLDivElement>) => {
@@ -41,7 +77,6 @@ function App() {
     const userMessage = input.trim();
     setInput('');
     
-    // Add user message and an empty placeholder for the assistant response
     setMessages((prev) => [
       ...prev,
       { role: 'user', content: userMessage },
@@ -71,7 +106,6 @@ function App() {
         if (done) break;
 
         const chunk = decoder.decode(value, { stream: true });
-        // Ollama streams newline-delimited JSON objects
         const lines = chunk.split('\n');
 
         for (const line of lines) {
@@ -79,7 +113,6 @@ function App() {
             const parsed = JSON.parse(line);
             if (parsed.response) {
               accumulatedResponse += parsed.response;
-              // Update the latest assistant message incrementally
               setMessages((prev) => {
                 const newMessages = [...prev];
                 newMessages[newMessages.length - 1] = {
