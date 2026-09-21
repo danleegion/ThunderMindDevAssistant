@@ -164,3 +164,50 @@ body {
   color: #666;
   cursor: not-allowed;
 }
+
+.code-block-wrapper {
+  margin: 8px 0;
+  border-radius: 6px;
+  background-color: #1e1e1e;
+  border: 1px solid #333;
+  overflow: hidden;
+}
+
+.code-block-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #2d2d2d;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #888;
+  border-bottom: 1px solid #333;
+}
+
+.code-language {
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.code-copy-btn {
+  background: transparent;
+  border: none;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  transition: background 0.2s, color 0.2s;
+}
+
+.code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.message-content pre {
+  margin: 0;
+  padding: 10px;
+  background-color: #1e1e1e !important;
+  overflow-x: auto;
+}
